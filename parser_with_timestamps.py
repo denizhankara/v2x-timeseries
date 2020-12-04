@@ -188,7 +188,7 @@ def get_attackers(df):
     return attacker_dict
 
 
-def extractFeatures(df,attacker_filename):
+def extractFeatures(df,attacker_filename,full_set=False):
 
     my_set_of_params = {'autocorrelation': [{'lag': 0}, {'lag': 1}, {'lag': 2}, {'lag': 3}, {'lag': 4}, {'lag': 5}, {'lag': 6}, {'lag': 7}, {'lag': 8}, {'lag': 9}],
                         'agg_autocorrelation': [{'f_agg': 'mean', 'maxlag': 40}, {'f_agg': 'median', 'maxlag': 40}, {'f_agg': 'var', 'maxlag': 40}],
@@ -297,10 +297,13 @@ def extractFeatures(df,attacker_filename):
 
     # stack the dataframe for supporting different sample freqs
 
-    settings = MinimalFCParameters()
-    default_fc_parameters = settings.update(my_set_of_params)
-    extracted_features = extract_features(new_df, column_id="transmission_ID", column_sort="rcvTime",default_fc_parameters=settings)
-    #labels_df = pd.DataFrame(index = extracted_features.index.copy())
+    if full_set:
+        extracted_features = extract_features(new_df, column_id="transmission_ID", column_sort="rcvTime")
+    else:
+        settings = MinimalFCParameters()
+        default_fc_parameters = settings.update(my_set_of_params)
+        extracted_features = extract_features(new_df, column_id="transmission_ID", column_sort="rcvTime",default_fc_parameters=settings)
+        #labels_df = pd.DataFrame(index = extracted_features.index.copy())
     labels = []
 
     for index,row in extracted_features.iterrows():
@@ -317,10 +320,10 @@ def extractFeatures(df,attacker_filename):
     features_filtered['labels'] = labels
     return features_filtered,labels
 
-def featureExtractorFromcsv(filename,attacker_filename):
+def featureExtractorFromcsv(filename,attacker_filename,full_set = False):
     print("Start extracting features from  time series")
     df = pd.read_csv(filename)
-    features_filtered, labels = extractFeatures(df,attacker_filename)
+    features_filtered, labels = extractFeatures(df,attacker_filename,full_set=full_set)
     print("done feature extraction")
     simulation_case = os.path.splitext(filename)[0]
     feature_file_name = simulation_case +'_features.csv'
@@ -337,16 +340,35 @@ def makePrediction(features_file,labels_file):
     labels = loadtxt(labels_file, delimiter=',')
     xgb_model = xgb.XGBClassifier(objective="binary:logistic", random_state=0)
     features = features.drop(['id', 'labels'], axis=1)
+
+    X_train, X_test, y_train, y_test = train_test_split(features, labels,
+                                                        stratify=labels,
+                                                        test_size=0.2,random_state=0)
     # scores = cross_val_score(xgb_model, features, labels, scoring=("precision","recall"), cv=10)
 
-    xgb_model.fit(features, labels)
-    y_pred = xgb_model.predict(features)
+    #xgb_model.fit(features, labels)
+    xgb_model.fit(X_train,y_train)
+
+
+    #y_pred = xgb_model.predict(features)
+    y_pred = xgb_model.predict(X_test)
+
+    print(confusion_matrix(y_test, y_pred))
+    accuracy = accuracy_score(y_test, y_pred)
+    print('Accuracy: %.3f' % accuracy)
+
+    precision = precision_score(y_test, y_pred, average='binary')
+    print('Precision: %.3f' % precision)
+    recall = recall_score(y_test, y_pred, average='binary')
+    print('Recall: %.3f' % recall)
+
+    """
     print(confusion_matrix(labels, y_pred))
     precision = precision_score(labels, y_pred, average='binary')
     print('Precision: %.3f' % precision)
     recall = recall_score(labels, y_pred, average='binary')
     print('Recall: %.3f' % recall)
-
+    """
     pass
 
 def createAttackerRecord(filename): # extract malicious vehicles from given csv
@@ -359,6 +381,24 @@ def createAttackerRecord(filename): # extract malicious vehicles from given csv
 
 if __name__ == "__main__":
 
+    # find better extractors
+
+    # case 1
+    filename = "veins_maat.uc1.14505247.180205_165727.csv"
+    print(filename)
+    attacker_filename = "veins_maat.uc1.14505247.180205_165727_attackers.json"  # createAttackerRecord(filename)
+
+    feature_file_name,label_file_name= featureExtractorFromcsv(filename,attacker_filename,full_set=True)
+    features_file = feature_file_name # "veins_maat.uc1.14505247.180205_165727_features.csv"  # feature_file_name
+    labels_file = label_file_name # "veins_maat.uc1.14505247.180205_165727_labels.csv"  # label_file_name
+    makePrediction(features_file, labels_file)
+
+
+
+    exit()
+
+
+    # case 1
     filename = "veins_maat.uc1.14505247.180205_165727.csv"
     print(filename)
     attacker_filename = "veins_maat.uc1.14505247.180205_165727_attackers.json" #createAttackerRecord(filename)
@@ -368,17 +408,55 @@ if __name__ == "__main__":
     labels_file = "veins_maat.uc1.14505247.180205_165727_labels.csv" #label_file_name
     makePrediction(features_file,labels_file)
 
-
-
+    # case 2
     filename = "veins_maat.uc1.14505342.180205_171010.csv"
     print(filename)
-    attacker_filename = createAttackerRecord(filename)
+    attacker_filename ="veins_maat.uc1.14505342.180205_171010_attackers.json" #createAttackerRecord(filename)
 
-    feature_file_name,label_file_name= featureExtractorFromcsv(filename,attacker_filename)
-    features_file = feature_file_name
-    labels_file = label_file_name
-    makePrediction(features_file,labels_file)
+    #feature_file_name, label_file_name = featureExtractorFromcsv(filename, attacker_filename)
+    features_file ="veins_maat.uc1.14505342.180205_171010_features.csv" #feature_file_name
+    labels_file = "veins_maat.uc1.14505342.180205_171010_labels.csv" #label_file_name
+    makePrediction(features_file, labels_file)
 
+
+
+    # case 3
+    filename = "veins_maat.uc1.14505511.180205_173553.csv"
+    print(filename)
+    attacker_filename = "veins_maat.uc1.14505511.180205_173553_attackers.json"#createAttackerRecord(filename)
+
+    #feature_file_name, label_file_name = featureExtractorFromcsv(filename, attacker_filename)
+    features_file = "veins_maat.uc1.14505511.180205_173553_features.csv"#feature_file_name
+    labels_file = "veins_maat.uc1.14505511.180205_173553_labels.csv"#label_file_name
+    makePrediction(features_file, labels_file)
+
+    # case 4
+    filename = "veins_maat.uc1.14505930.180205_192941.csv"
+    print(filename)
+    attacker_filename = "veins_maat.uc1.14505930.180205_192941_attackers.json" #createAttackerRecord(filename)
+
+    #feature_file_name, label_file_name = featureExtractorFromcsv(filename, attacker_filename)
+    features_file = "veins_maat.uc1.14505930.180205_192941_features.csv" #feature_file_name
+    labels_file = "veins_maat.uc1.14505930.180205_192941_labels.csv"#label_file_name
+    makePrediction(features_file, labels_file)
+
+
+    # case 5
+    filename = "veins_maat.uc1.14506016.180205_200240.csv"
+    print(filename)
+    attacker_filename ="veins_maat.uc1.14506016.180205_200240_attackers.json" #createAttackerRecord(filename)
+
+    #feature_file_name, label_file_name = featureExtractorFromcsv(filename, attacker_filename)
+    features_file ="veins_maat.uc1.14506016.180205_200240_features.csv" #feature_file_name
+    labels_file ="veins_maat.uc1.14506016.180205_200240_labels.csv" #label_file_name
+    makePrediction(features_file, labels_file)
+
+
+
+    exit()
+
+
+    # case 3
     filename = "veins_maat.uc1.14505511.180205_173553.csv"
     print(filename)
     attacker_filename = createAttackerRecord(filename)
@@ -388,16 +466,8 @@ if __name__ == "__main__":
     labels_file = label_file_name
     makePrediction(features_file, labels_file)
 
+    # case 4
     filename = "veins_maat.uc1.14505930.180205_192941.csv"
-    print(filename)
-    attacker_filename = createAttackerRecord(filename)
-
-    feature_file_name, label_file_name = featureExtractorFromcsv(filename, attacker_filename)
-    features_file = feature_file_name
-    labels_file = label_file_name
-    makePrediction(features_file, labels_file)
-
-    filename = "veins_maat.uc1.14506016.180205_200240.csv"
     print(filename)
     attacker_filename = createAttackerRecord(filename)
 
