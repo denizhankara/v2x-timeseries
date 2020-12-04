@@ -189,7 +189,7 @@ def get_attackers(df):
 
 
 def extractFeatures(df,attacker_filename,full_set=False):
-
+    
     my_set_of_params = {'autocorrelation': [{'lag': 0}, {'lag': 1}, {'lag': 2}, {'lag': 3}, {'lag': 4}, {'lag': 5}, {'lag': 6}, {'lag': 7}, {'lag': 8}, {'lag': 9}],
                         'agg_autocorrelation': [{'f_agg': 'mean', 'maxlag': 40}, {'f_agg': 'median', 'maxlag': 40}, {'f_agg': 'var', 'maxlag': 40}],
                         'number_cwt_peaks' : [{'n': 1}, {'n': 5}],
